@@ -1,63 +1,92 @@
 ﻿
 using System;
-using System.Configuration;
-using System.Collections.Specialized;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web.Configuration;
 
 namespace Main_Program
 {
     class Program
     {
-        private static string directory;
+        private static string directory;   //адрес текущей директории
+        private static int positions;      //Количество файлов на одной странице
+        private static int pages=1;        //текущая страница
+
 
         static void Main(string[] args)
         {
-            string ans, sAttr;
+            string ans;
             Console.SetWindowSize(200,50);
 
             Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-            AppSettingsSection appsettings = (AppSettingsSection)config.GetSection("appSettings");
+            AppSettingsSection appsettings = (AppSettingsSection)config.GetSection("appSettings");              //Изменение секции "AppSettings" конфигурационного файла
             
-            directory = appsettings.Settings["Path"].Value;
+            directory = appsettings.Settings["Path"].Value;                         //Загрузка последней  директории
+            positions = int.Parse(appsettings.Settings["Positions"].Value);         // Загрузка количества элементов на одной стр
 
+            
             while (true)
             {
-                Directory.SetCurrentDirectory(directory);
+                Directory.SetCurrentDirectory(directory);                           //Переход терминала к текущей папке
                 Console.ForegroundColor = ConsoleColor.DarkRed;
                 Console.Write($"{directory} >> ");
-                ans = Console.ReadLine();
+                ans = Console.ReadLine();                                           //Ввод команды
                 Console.ForegroundColor = ConsoleColor.Gray;
-                string[] ans_arr = ans.Split(' ');
+                string[] ans_arr = ans.Split(' ');                                  //Разбиение на аргументы
 
 
                 if (ans == "ls")                                  // look files
                 {
-                    LookFiles();
-                    LookDirectories();
+                    while (true)
+                    {
+                        
+                        Console.Clear();
+                        LookFiles();                                                //Отображение файлов в консоли
+                        ConsoleKeyInfo ans2 = Console.ReadKey();                    //Ключ для переключения страниц ls
+
+                        if (ans2.Key == ConsoleKey.RightArrow)
+                        {
+                            pages++;
+                        }
+
+                        else if (ans2.Key == ConsoleKey.LeftArrow)
+                        {
+                            pages--;
+                        }
+
+                        else                                                        // выход из ls
+                        {
+                            Console.Clear();
+                            pages = 1;
+                            break;
+
+                        }
+
+                    }
                 }
 
                 else if (ans_arr[0] == "cf")                      // copy file
                 {
+
                     CopyFileTo("CmDust-Result.log", "new2.log", @"C:\Users\Konstantin\Videos\new2.log");
                     ans = "";
+
                 }
+
+
                 else if (ans_arr[0] == "cd")                      // change dir
                 {
                     try
                     {
-                        if (ans_arr[1] == "~")
+                        if (ans_arr[1] == "~")                                                      //возврат на уровень выше
                         {
                             directory = Convert.ToString(Directory.GetParent(directory));
                         }
                         else
                         {
-                            ChangeDir(ans_arr[1]);
-                        }
+                            ChangeDir(ans_arr[1]);                                                  //смена директории
+                        }   
 
                     }
                     catch (Exception)
@@ -67,20 +96,27 @@ namespace Main_Program
                     }
 
                 }
+
+
                 else if (ans == "clr")                            // clear console
                 {
                     Console.Clear();
                 }
 
-                else if (ans_arr[0] == "delfolder") // delete folder
+
+                else if (ans_arr[0] == "delfolder") // delete folder <имя папки>
                 {
                     Directory.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}", true);
                 }
-                else if (ans_arr[0] == "delfile")
+
+
+                else if (ans_arr[0] == "delfile")   // delfile <имя файла>
                 {
                     File.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}");
                 }
-                appsettings.Settings["Path"].Value = directory;
+
+
+                appsettings.Settings["Path"].Value = directory;             //обновление и сохранение текущей директории
                 config.Save(ConfigurationSaveMode.Modified);
             }
 
@@ -90,41 +126,66 @@ namespace Main_Program
         static void LookFiles()
         {
 
-            string[] all_files = Directory.GetFiles(directory);
+            List<string> all_files = Directory.GetFiles(directory).ToList();                    /*сбор и объединение в один список*/
+            List<string> all_directories = Directory.GetDirectories(directory).ToList();         /*файлов и директорий для прохождения циклом*/                                
+            List<string> all_objects = all_files.Union(all_directories).ToList();
             DirectoryInfo DirArr = new DirectoryInfo(directory);
             FileInfo[] FileArr = DirArr.GetFiles();
-
-            for (int i = 0; i < all_files.Length; i++)
-            {
-                
-                Console.WriteLine($"{all_files[i]} ");
-                Console.SetCursorPosition(120, Console.CursorTop-1);
-                Console.Write($"{File.GetLastWriteTime(all_files[i])}\n");
-                Console.SetCursorPosition(150, Console.CursorTop-1);
-                Console.WriteLine($"{FileArr[i].Length} байт \n");
-
-            }
             
-        }
+            double size = 0;                                                                //переменная для хранения размера папок
+            
 
-
-
-        static void LookDirectories()
-        {
-
-            string[] all_directories = Directory.GetDirectories(directory);
-            double size = 0;
-            for (int i = 0; i < all_directories.Length; i++)
+            if (pages < 1)                                                                  //Ограничение по выходу за пределы страниц
             {
-                Console.WriteLine($"{all_directories[i]} ");
-                Console.SetCursorPosition(120, Console.CursorTop-1);
-                Console.Write($"{Directory.GetLastAccessTime(all_directories[i])}\n");
-                Console.SetCursorPosition(150, Console.CursorTop-1);
-                Console.WriteLine($"{GetDirSize(all_directories[i], ref size)} байт \n");
+                pages = 1;
             }
+            else if (pages > all_objects.Count / positions)
+            {
+                pages = all_objects.Count / positions+1;
+            }
+
+
+            for (int i = (pages - 1) * positions; i >= 0 && i < pages * positions && i < all_files.Count; i++)  //Постраничный вывод файлов
+            {
+
+                Console.WriteLine($"{all_files[i]} ");
+                Console.SetCursorPosition(120, Console.CursorTop - 1);
+                Console.Write($"{File.GetLastWriteTime(all_files[i])}\n");
+                Console.SetCursorPosition(150, Console.CursorTop - 1);
+                Console.WriteLine($"{FileArr[i].Length} байт \n");
+                
+
+            }
+
+            for (int i = (pages - 1) * positions; i < pages * positions && i >= all_files.Count && i < all_objects.Count; i++)//Постраничный вывод директорий
+
+            {
+                try
+                {
+                    Console.WriteLine($"{all_objects[i]} ");
+                    Console.SetCursorPosition(120, Console.CursorTop - 1);
+                    Console.Write($"{Directory.GetLastAccessTime(all_objects[i])}\n");
+                    Console.SetCursorPosition(150, Console.CursorTop - 1);
+                    Console.WriteLine($"{GetDirSize(all_objects[i], ref size)} байт \n");
+                }
+                catch (UnauthorizedAccessException)         //Для таких папок, как "Application Data"
+                {
+                    Console.WriteLine("Нет доступа к этой папке\n");
+                
+                }
+
+            }
+
+            Console.WriteLine($"Страница {pages} из {all_objects.Count / positions + 1}");
+
+
+
+
         }
 
-        static double GetDirSize(string folder, ref double size)
+
+
+        static double GetDirSize(string folder, ref double size) //Функция для получения размера папки. Используя рекурсию, проходимся по папкам и суммируем размеры
 
         {
             DirectoryInfo DirArr = new DirectoryInfo(folder);
@@ -145,7 +206,7 @@ namespace Main_Program
         }
 
 
-        static void CopyFileTo(string old_name, string new_name, string path)
+        static void CopyFileTo(string old_name, string new_name, string path)       //копирование файла и перемещение в другую директорию
         {
             File.Copy(old_name, new_name);
             File.Move(new_name, path);
@@ -167,7 +228,7 @@ namespace Main_Program
 
         }
         
-        static void ChangeDir(string NextDir)                                           // работает
+        static void ChangeDir(string NextDir)                                           //Изменение директории.
         {
             directory = $@"{Directory.GetCurrentDirectory()}\{NextDir}";
             Directory.SetCurrentDirectory(directory);
