@@ -1,28 +1,36 @@
-﻿using System;
+﻿
+using System;
+using System.Configuration;
+using System.Collections.Specialized;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web.Configuration;
 
 namespace Main_Program
 {
     class Program
     {
         private static string directory;
+
         static void Main(string[] args)
         {
-            string ans;
+            string ans, sAttr;
             Console.SetWindowSize(200,50);
-           
-            directory = Directory.GetCurrentDirectory();
+
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            AppSettingsSection appsettings = (AppSettingsSection)config.GetSection("appSettings");
+            
+            directory = appsettings.Settings["Path"].Value;
 
             while (true)
             {
                 Directory.SetCurrentDirectory(directory);
                 Console.ForegroundColor = ConsoleColor.DarkRed;
                 Console.Write($"{directory} >> ");
-                ans=Console.ReadLine();
+                ans = Console.ReadLine();
                 Console.ForegroundColor = ConsoleColor.Gray;
                 string[] ans_arr = ans.Split(' ');
 
@@ -44,26 +52,26 @@ namespace Main_Program
                     {
                         if (ans_arr[1] == "~")
                         {
-                            directory=Convert.ToString(Directory.GetParent(directory));
+                            directory = Convert.ToString(Directory.GetParent(directory));
                         }
                         else
                         {
-                            ChangeDir(ans_arr[1]); 
+                            ChangeDir(ans_arr[1]);
                         }
-                        
+
                     }
                     catch (Exception)
                     {
                         Console.WriteLine("Нет такой директории. Проверьте имя и повторите попытку");
-  
+
                     }
-                    
+
                 }
                 else if (ans == "clr")                            // clear console
                 {
                     Console.Clear();
                 }
-                
+
                 else if (ans_arr[0] == "delfolder") // delete folder
                 {
                     Directory.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}", true);
@@ -72,9 +80,10 @@ namespace Main_Program
                 {
                     File.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}");
                 }
-
+                appsettings.Settings["Path"].Value = directory;
+                config.Save(ConfigurationSaveMode.Modified);
             }
-            
+
             
         }
 
@@ -84,6 +93,7 @@ namespace Main_Program
             string[] all_files = Directory.GetFiles(directory);
             DirectoryInfo DirArr = new DirectoryInfo(directory);
             FileInfo[] FileArr = DirArr.GetFiles();
+
             for (int i = 0; i < all_files.Length; i++)
             {
                 
