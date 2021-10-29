@@ -14,7 +14,8 @@ namespace Main_Program
         private static int positions;      //Количество файлов на одной странице
         private static int pages=1;        //текущая страница
         private static string path_new = "", Initial_Dir="";
-
+        private static string bufer ;
+        private static List<Exception> ToSave=new List<Exception>();
 
         private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
         {
@@ -63,7 +64,15 @@ namespace Main_Program
             Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             AppSettingsSection appsettings = (AppSettingsSection)config.GetSection("appSettings");              //Изменение секции "AppSettings" конфигурационного файла
 
-            directory = appsettings.Settings["Path"].Value;                         //Загрузка последней  директории
+            try
+            {
+                directory = appsettings.Settings["Path"].Value;    //Загрузка последней  директории
+            }
+            catch
+            {
+                directory = @"C:\";
+            }                   
+            
             positions = int.Parse(appsettings.Settings["Positions"].Value);         // Загрузка количества элементов на одной стр
 
 
@@ -109,10 +118,17 @@ namespace Main_Program
 
                 else if (ans_arr[0] == "cf")                      // copy file
                 {
-
-                    CopyFileTo("CmDust-Result.log", "new2.log", @"C:\Users\Konstantin\Videos\new2.log");
-                    ans = "";
-
+                    try
+                    {
+                        CopyFileTo(ans_arr[1], ans_arr[1], ans_arr[2]);
+                        ans = "";
+                    }
+                    
+                    catch (IndexOutOfRangeException e)
+                    {
+                        Console.WriteLine("Недостаточно аргументов.");
+                        ToSave.Append(e);
+                    }
                 }
 
 
@@ -130,10 +146,10 @@ namespace Main_Program
                         }
 
                     }
-                    catch (Exception)
+                    catch (Exception e)
                     {
                         Console.WriteLine("Нет такой директории. Проверьте имя и повторите попытку");
-
+                        ToSave.Append(e);
                     }
 
                 }
@@ -146,28 +162,58 @@ namespace Main_Program
 
                 else if (ans_arr[0] == "copydir")
                 {
-                    Console.WriteLine(Directory.GetCurrentDirectory());
-                    Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]));
-                    Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]));
-                    DirectoryCopy(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]), Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]), true);
+                    try
+                    {
+
+                        Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]));
+                        Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]));
+                        DirectoryCopy(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]), Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]), true);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Ошибка в синтаксисе (см. документацию)");
+                        ToSave.Append(e);
+                    }
+                    
 
                 }
 
 
                 else if (ans_arr[0] == "delfolder") // delete folder <имя папки>
                 {
-                    Directory.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}", true);
+                    try
+                    {
+                        Directory.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}", true);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Нет такой директории");
+                        ToSave.Append(e);
+                    }
+                    
                 }
 
 
                 else if (ans_arr[0] == "delfile")   // delfile <имя файла>
                 {
-                    File.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}");
+                    try
+                    {
+                        File.Delete($@"{Directory.GetCurrentDirectory()}\{ans_arr[1]}");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Нет такой директории");
+                        ToSave.Append(e);
+                    }
+                    
                 }
 
-
-                appsettings.Settings["Path"].Value = directory;             //обновление и сохранение текущей директории
-                config.Save(ConfigurationSaveMode.Modified);
+                if (ToSave.Count==0)
+                {
+                    appsettings.Settings["Path"].Value = directory;             //обновление и сохранение текущей директории
+                    config.Save(ConfigurationSaveMode.Modified);
+                }
+                
             }
 
 
@@ -218,8 +264,9 @@ namespace Main_Program
                     Console.SetCursorPosition(150, Console.CursorTop - 1);
                     Console.WriteLine($"{GetDirSize(all_objects[i], ref size)} байт \n");
                 }
-                catch (UnauthorizedAccessException)         //Для таких папок, как "Application Data"
+                catch (UnauthorizedAccessException e )         //Для таких папок, как "Application Data"
                 {
+                    ToSave.Append(e);
                     Console.WriteLine("Нет доступа к этой папке\n");
                 
                 }
@@ -258,14 +305,33 @@ namespace Main_Program
 
         static void CopyFileTo(string old_name, string new_name, string path)       //копирование файла и перемещение в другую директорию
         {
-            File.Copy(old_name, new_name);
-            File.Move(new_name, path);
+            try
+            {
+                File.Copy(old_name, new_name);
+                File.Move(new_name, path);
+            }
+            
+            catch (Exception e )
+            {
+                ToSave.Append(e);
+                Console.WriteLine("Ошибка ввода (См в документации)");
+            }
         }
 
         static void ChangeDir(string NextDir)                                           //Изменение директории.
         {
-            directory = $@"{Directory.GetCurrentDirectory()}\{NextDir}";
-            Directory.SetCurrentDirectory(directory);
+            try
+            {
+                bufer = directory;
+                directory = $@"{Directory.GetCurrentDirectory()}\{NextDir}";
+                Directory.SetCurrentDirectory(directory);
+            }
+            catch (Exception e)
+            {
+                directory = bufer;
+                ToSave.Append(e);
+            }
+            
         }
     }
 }
