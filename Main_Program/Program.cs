@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
 using System.Linq;
+using System.Web.Hosting;
 
 namespace Main_Program
 {
@@ -12,20 +13,60 @@ namespace Main_Program
         private static string directory;   //адрес текущей директории
         private static int positions;      //Количество файлов на одной странице
         private static int pages=1;        //текущая страница
+        private static string path_new = "", Initial_Dir="";
+
+
+        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
+        {
+            // Get the subdirectories for the specified directory.
+            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
+
+            if (!dir.Exists)
+            {
+                throw new DirectoryNotFoundException(
+                    "Source directory does not exist or could not be found: "
+                    + sourceDirName);
+            }
+
+            DirectoryInfo[] dirs = dir.GetDirectories();
+        
+            // If the destination directory doesn't exist, create it.       
+            Directory.CreateDirectory(destDirName);        
+
+            // Get the files in the directory and copy them to the new location.
+            FileInfo[] files = dir.GetFiles();
+            foreach (FileInfo file in files)
+            {
+                string tempPath = Path.Combine(destDirName, file.Name);
+                file.CopyTo(tempPath, false);
+            }
+
+            // If copying subdirectories, copy them and their contents to new location.
+            if (copySubDirs)
+            {
+                foreach (DirectoryInfo subdir in dirs)
+                {
+                    string tempPath = Path.Combine(destDirName, subdir.Name);
+                    DirectoryCopy(subdir.FullName, tempPath, copySubDirs);
+                }
+            }
+        }
+
 
 
         static void Main(string[] args)
         {
+            
             string ans;
-            Console.SetWindowSize(200,50);
+            Console.SetWindowSize(200, 50);
 
             Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             AppSettingsSection appsettings = (AppSettingsSection)config.GetSection("appSettings");              //Изменение секции "AppSettings" конфигурационного файла
-            
+
             directory = appsettings.Settings["Path"].Value;                         //Загрузка последней  директории
             positions = int.Parse(appsettings.Settings["Positions"].Value);         // Загрузка количества элементов на одной стр
 
-            
+
             while (true)
             {
                 Directory.SetCurrentDirectory(directory);                           //Переход терминала к текущей папке
@@ -40,7 +81,7 @@ namespace Main_Program
                 {
                     while (true)
                     {
-                        
+
                         Console.Clear();
                         LookFiles();                                                //Отображение файлов в консоли
                         ConsoleKeyInfo ans2 = Console.ReadKey();                    //Ключ для переключения страниц ls
@@ -86,7 +127,7 @@ namespace Main_Program
                         else
                         {
                             ChangeDir(ans_arr[1]);                                                  //смена директории
-                        }   
+                        }
 
                     }
                     catch (Exception)
@@ -101,6 +142,15 @@ namespace Main_Program
                 else if (ans == "clr")                            // clear console
                 {
                     Console.Clear();
+                }
+
+                else if (ans_arr[0] == "copydir")
+                {
+                    Console.WriteLine(Directory.GetCurrentDirectory());
+                    Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]));
+                    Console.WriteLine(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]));
+                    DirectoryCopy(Path.Combine(Directory.GetCurrentDirectory(), ans_arr[1]), Path.Combine(Directory.GetCurrentDirectory(), ans_arr[2]), true);
+
                 }
 
 
@@ -120,14 +170,14 @@ namespace Main_Program
                 config.Save(ConfigurationSaveMode.Modified);
             }
 
-            
+
         }
 
-        static void LookFiles()
-        {
+         static void LookFiles()
+         {
 
-            List<string> all_files = Directory.GetFiles(directory).ToList();                    /*сбор и объединение в один список*/
-            List<string> all_directories = Directory.GetDirectories(directory).ToList();         /*файлов и директорий для прохождения циклом*/                                
+             List<string> all_files = Directory.GetFiles(directory).ToList();                    /*сбор и объединение в один список*/
+             List<string> all_directories = Directory.GetDirectories(directory).ToList();         /*файлов и директорий для прохождения циклом*/                                
             List<string> all_objects = all_files.Union(all_directories).ToList();
             DirectoryInfo DirArr = new DirectoryInfo(directory);
             FileInfo[] FileArr = DirArr.GetFiles();
@@ -212,22 +262,6 @@ namespace Main_Program
             File.Move(new_name, path);
         }
 
-
-
-        static void CopyDirTo(string old_name, string new_name, string path)    // доработать
-        {
-            string[] files = Directory.GetFiles(old_name);
-            Directory.CreateDirectory(path);
-            for (int i = 0; i < files.Length; i++)
-            {
-                Console.Write(Directory.GetCurrentDirectory());
-                File.Copy(files[i], Path.Combine(path, files[i]+"123"), true);
-                
-
-            }
-
-        }
-        
         static void ChangeDir(string NextDir)                                           //Изменение директории.
         {
             directory = $@"{Directory.GetCurrentDirectory()}\{NextDir}";
